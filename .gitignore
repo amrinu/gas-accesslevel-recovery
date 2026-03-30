@@ -1,0 +1,4 @@
+# Apps Script credentials & local configs
+.clasp.json
+creds.json
+node_modules/
