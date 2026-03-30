@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CAA Recovery Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    const StatusBadge = ({ code }) => {
+      const styles = {
+        'SYNCED': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'MODIFIED': 'bg-amber-50 text-amber-700 border-amber-200',
+        'DELETED': 'bg-rose-50 text-rose-700 border-rose-200',
+        'NEW': 'bg-blue-50 text-blue-700 border-blue-200'
+      };
+      return <span className={`px-2.5 py-1 rounded border text-xs font-semibold ${styles[code]}`}>{code}</span>;
+    };
+
+    const App = () => {
+      const [policies, setPolicies] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      const load = () => {
+        setLoading(true);
+        google.script.run.withSuccessHandler(data => { setPolicies(data); setLoading(false); }).getDashboardData();
+      };
+
+      useEffect(() => { load(); }, []);
+
+      const sync = () => {
+        setLoading(true);
+        google.script.run.withSuccessHandler(() => load()).syncSystemToSheet();
+      };
+
+      const restore = (p) => {
+        if (!confirm("Restore this policy?")) return;
+        setLoading(true);
+        google.script.run.withSuccessHandler(() => load()).restorePolicyToGCP(p.resourceName, p.backupJson, p.statusCheck);
+      };
+
+      return (
+        <div className="p-8 max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-800">CAA Recovery Console</h1>
+            <button onClick={sync} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Force Sync & Backup</button>
+          </div>
+          <div className="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold">
+                <tr><th className="p-4">Policy Title</th><th className="p-4">Status</th><th className="p-4">Action</th></tr>
+              </thead>
+              <tbody>
+                {loading ? <tr><td colSpan="3" className="p-10 text-center"><div className="loader mx-auto"></div></td></tr> : 
+                  policies.map((p, i) => (
+                    <tr key={i} className="border-b border-slate-100 last:border-0">
+                      <td className="p-4 font-medium">{p.title}</td>
+                      <td className="p-4"><StatusBadge code={p.statusCheck} /></td>
+                      <td className="p-4">
+                        <button disabled={p.statusCheck==='SYNCED'} onClick={() => restore(p)} className="text-blue-600 hover:underline disabled:opacity-30">Restore</button>
+                      </td>
+                    </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    };
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
